@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+  :root {
+    --primary: #2563eb;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --text: #1e293b;
+    --text-sub: #64748b;
+    --border: #e2e8f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { background: var(--bg); color: var(--text); padding: 16px; font-size: 14px; }
+  .sim-container { max-width: 800px; margin: 0 auto; background: var(--card); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); }
+  h2 { font-size: 1.25rem; margin-bottom: 16px; text-align: center; color: var(--text); }
+  
+  .input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .input-group { display: flex; flex-direction: column; }
+  .input-group label { font-size: 0.75rem; font-weight: 600; color: var(--text-sub); margin-bottom: 4px; }
+  .input-group input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; outline: none; }
+  .input-group input:focus { border-color: var(--primary); }
+
+  .cards-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .card { border: 1px solid var(--border); border-radius: 8px; padding: 14px; background: #fff; display: flex; flex-direction: column; justify-content: space-between; }
+  .card.highlight { border-color: var(--primary); background: #f0f7ff; }
+  .card-title { font-size: 0.95rem; font-weight: bold; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .card-row { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 0.85rem; }
+  .card-row.total { font-weight: bold; font-size: 1rem; margin-top: 8px; padding-top: 8px; border-top: 1px dashed var(--border); color: #dc2626; }
+  .card-row.asset { color: #059669; font-weight: 600; }
+
+  .note-box { background: #f1f5f9; padding: 12px; border-radius: 6px; font-size: 0.75rem; color: var(--text-sub); line-height: 1.5; }
+</style>
+</head>
+<body>
+
+<div class="sim-container">
+  <h2>🚗 車両購入比較シミュレーター（資金保有前提）</h2>
+
+  <div class="input-grid">
+    <div class="input-group">
+      <label>車両購入総額 (円)</label>
+      <input type="number" id="price" value="3500000" step="100000">
+    </div>
+    <div class="input-group">
+      <label>返済年数 (年)</label>
+      <input type="number" id="years" value="5" min="1" max="10">
+    </div>
+    <div class="input-group">
+      <label>通常ローン金利 (実質年率 %)</label>
+      <input type="number" id="loanRate" value="3.5" step="0.1">
+    </div>
+    <div class="input-group">
+      <label>残クレ金利 (実質年率 %)</label>
+      <input type="number" id="resRate" value="4.5" step="0.1">
+    </div>
+    <div class="input-group">
+      <label>残価率 (%)</label>
+      <input type="number" id="resRatePct" value="50" min="0" max="70">
+    </div>
+    <div class="input-group">
+      <label>手元資金の想定利回り (%)</label>
+      <input type="number" id="investRate" value="10.0" step="0.5">
+    </div>
+  </div>
+
+  <div class="cards-grid">
+    <!-- 一括購入 -->
+    <div class="card">
+      <div>
+        <div class="card-title">① 一括払い</div>
+        <div class="card-row"><span>頭金・初期支払</span><span id="cashUpfront">-</span></div>
+        <div class="card-row"><span>月々支払額</span><span>0 円</span></div>
+        <div class="card-row"><span>発生利息総額</span><span>0 円</span></div>
+        <div class="card-row total"><span>総支払額</span><span id="cashTotal">-</span></div>
+      </div>
+      <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 6px;">
+        <div class="card-row asset"><span>期間満了時の手元資産</span><span id="cashAsset">-</span></div>
+      </div>
+    </div>
+
+    <!-- 通常ローン -->
+    <div class="card">
+      <div>
+        <div class="card-title">② 通常ローン (元利均等)</div>
+        <div class="card-row"><span>頭金</span><span>0 円</span></div>
+        <div class="card-row"><span>月々支払額</span><span id="loanMonthly">-</span></div>
+        <div class="card-row"><span>発生利息総額</span><span id="loanInterest">-</span></div>
+        <div class="card-row total"><span>総支払額</span><span id="loanTotal">-</span></div>
+      </div>
+      <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 6px;">
+        <div class="card-row asset"><span>期間満了時の手元資産</span><span id="loanAsset">-</span></div>
+      </div>
+    </div>
+
+    <!-- 残クレ -->
+    <div class="card highlight">
+      <div>
+        <div class="card-title">③ 残クレ (最終買取前提)</div>
+        <div class="card-row"><span>最終据置残価</span><span id="resValue">-</span></div>
+        <div class="card-row"><span>月々支払額</span><span id="resMonthly">-</span></div>
+        <div class="card-row"><span>発生利息総額</span><span id="resInterest">-</span></div>
+        <div class="card-row total"><span>総支払額</span><span id="resTotal">-</span></div>
+      </div>
+      <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 6px;">
+        <div class="card-row asset"><span>期間満了時の手元資産</span><span id="resAsset">-</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note-box">
+    ※ <b>残クレの注意点：</b> 据置残価に対しても期間中の金利が満額発生するため、支払利息が大きくなります。<br>
+    ※ <b>手元資産の試算：</b> 購入時に車両代全額の手元資金があり、それを運用しながらローンを支払った場合（一括の場合は浮いた月返済額相当を積立運用した場合）の期間末資産額です。
+  </div>
+</div>
+
+<script>
+function calc() {
+  const P = parseFloat(document.getElementById('price').value) || 0;
+  const years = parseFloat(document.getElementById('years').value) || 1;
+  const n = years * 12;
+  const rLoan = (parseFloat(document.getElementById('loanRate').value) || 0) / 100 / 12;
+  const rRes = (parseFloat(document.getElementById('resRate').value) || 0) / 100 / 12;
+  const resPct = (parseFloat(document.getElementById('resRatePct').value) || 0) / 100;
+  const rInv = (parseFloat(document.getElementById('investRate').value) || 0) / 100 / 12;
+
+  const R = Math.round(P * resPct);
+
+  // ① 一括
+  const cashTotal = P;
+  document.getElementById('cashUpfront').innerText = P.toLocaleString() + ' 円';
+  document.getElementById('cashTotal').innerText = cashTotal.toLocaleString() + ' 円';
+
+  // ② 通常ローン
+  let mLoan = 0;
+  if (rLoan > 0) {
+    mLoan = Math.round(P * (rLoan * Math.pow(1 + rLoan, n)) / (Math.pow(1 + rLoan, n) - 1));
+  } else {
+    mLoan = Math.round(P / n);
+  }
+  const loanTotal = mLoan * n;
+  const loanInterest = loanTotal - P;
+  document.getElementById('loanMonthly').innerText = mLoan.toLocaleString() + ' 円';
+  document.getElementById('loanInterest').innerText = loanInterest.toLocaleString() + ' 円';
+  document.getElementById('loanTotal').innerText = loanTotal.toLocaleString() + ' 円';
+
+  // ③ 残クレ (据置額Rを最終月に払う計算)
+  let mRes = 0;
+  if (rRes > 0) {
+    mRes = Math.round(((P * Math.pow(1 + rRes, n) - R) * rRes) / (Math.pow(1 + rRes, n) - 1));
+  } else {
+    mRes = Math.round((P - R) / n);
+  }
+  const resTotal = (mRes * n) + R;
+  const resInterest = resTotal - P;
+  document.getElementById('resValue').innerText = R.toLocaleString() + ' 円';
+  document.getElementById('resMonthly').innerText = mRes.toLocaleString() + ' 円';
+  document.getElementById('resInterest').innerText = resInterest.toLocaleString() + ' 円';
+  document.getElementById('resTotal').innerText = resTotal.toLocaleString() + ' 円';
+
+  // 手元資金運用シミュレーション (P円の元手を運用しながら返済した場合)
+  // ローン/残クレ: 残高 S = P*(1+r)^n - M * sum((1+r)^k)
+  function getEndAsset(principal, monthlyPay, finalPay = 0) {
+    let balance = principal;
+    for (let i = 0; i < n; i++) {
+      balance = balance * (1 + rInv) - monthlyPay;
+    }
+    balance -= finalPay;
+    return Math.round(balance);
+  }
+
+  // 一括の場合: 最初に手元資金Pを失うが、毎月の支払いがないため同額を積立可能
+  // 比較の基準を揃えるため「手元資金Pを運用し続けた場合」との差分で算出
+  const cashEndAsset = 0; // 手元資金ゼロスタート
+  const loanEndAsset = getEndAsset(P, mLoan, 0);
+  const resEndAsset = getEndAsset(P, mRes, R);
+
+  // 一括との相対差額が直感的にわかるよう表示
+  document.getElementById('cashAsset').innerText = '基準 (0 円)';
+  document.getElementById('loanAsset').innerText = (loanEndAsset >= 0 ? '+' : '') + loanEndAsset.toLocaleString() + ' 円';
+  document.getElementById('resAsset').innerText = (resEndAsset >= 0 ? '+' : '') + resEndAsset.toLocaleString() + ' 円';
+}
+
+document.querySelectorAll('input').forEach(input => {
+  input.addEventListener('input', calc);
+});
+calc();
+</script>
+
+</body>
+</html>
